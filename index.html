@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firebase Firestore CRUD</title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { max-width: 600px; margin: 40px auto; padding: 0 20px; color: #333; }
+    h2 { margin-top: 0; }
+    
+    form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+    input, button { padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 4px; }
+    button { cursor: pointer; background-color: #007bff; color: white; border: none; font-weight: bold; }
+    button:hover { background-color: #0056b3; }
+    
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background-color: #f8f9fa; }
+    
+    .btn-edit { background-color: #ffc107; color: #000; padding: 6px 10px; border-radius: 3px; border: none; cursor: pointer; }
+    .btn-delete { background-color: #dc3545; color: white; padding: 6px 10px; border-radius: 3px; border: none; cursor: pointer; }
+    .btn-edit:hover { background-color: #e0a800; }
+    .btn-delete:hover { background-color: #c82333; }
+  </style>
+</head>
+<body>
+
+  <h2>User Detail Form</h2>
+  <form id="userForm">
+    <input type="hidden" id="userId">
+    <input type="text" id="userName" placeholder="Full Name" required>
+    <input type="email" id="userEmail" placeholder="Email Address" required>
+    <button type="submit" id="submitBtn">Add User</button>
+  </form>
+
+  <h2>Registered Users</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="userTableBody"></tbody>
+  </table>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      onSnapshot, 
+      deleteDoc, 
+      doc, 
+      updateDoc 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD7R_ni31U7wenQlxuGS9CDePF9ntouP6k",
+      authDomain: "myeditableform.firebaseapp.com",
+      projectId: "myeditableform",
+      storageBucket: "myeditableform.firebasestorage.app",
+      messagingSenderId: "555768400571",
+      appId: "1:555768400571:web:69cbedbd7f1694e44cb79e",
+      measurementId: "G-ZQN5CCM0FY"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const usersCol = collection(db, "users");
+
+    // DOM Elements
+    const form = document.getElementById("userForm");
+    const userIdInput = document.getElementById("userId");
+    const userNameInput = document.getElementById("userName");
+    const userEmailInput = document.getElementById("userEmail");
+    const submitBtn = document.getElementById("submitBtn");
+    const tableBody = document.getElementById("userTableBody");
+
+    // CREATE & UPDATE
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = userIdInput.value;
+      const name = userNameInput.value.trim();
+      const email = userEmailInput.value.trim();
+
+      try {
+        if (id) {
+          await updateDoc(doc(db, "users", id), { name, email });
+          submitBtn.innerText = "Add User";
+        } else {
+          await addDoc(usersCol, { name, email });
+        }
+        form.reset();
+        userIdInput.value = "";
+      } catch (err) {
+        console.error("Error saving data:", err);
+        alert("Failed to save user: " + err.message);
+      }
+    });
+
+    // READ (Real-time listener)
+    onSnapshot(usersCol, (snapshot) => {
+      tableBody.innerHTML = "";
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const tr = document.createElement("tr");
+        
+        tr.innerHTML = `
+          <td>${escapeHtml(data.name || '')}</td>
+          <td>${escapeHtml(data.email || '')}</td>
+          <td>
+            <button class="btn-edit" onclick="setEditMode('${docSnap.id}', '${escapeJs(data.name || '')}', '${escapeJs(data.email || '')}')">Edit</button>
+            <button class="btn-delete" onclick="deleteUser('${docSnap.id}')">Delete</button>
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    }, (error) => {
+      console.error("Firestore Read Error:", error);
+    });
+
+    // DELETE
+    window.deleteUser = async (id) => {
+      if (confirm("Delete this user?")) {
+        try {
+          await deleteDoc(doc(db, "users", id));
+        } catch (err) {
+          console.error("Error deleting document:", err);
+          alert("Failed to delete user: " + err.message);
+        }
+      }
+    };
+
+    // PREPARE EDIT
+    window.setEditMode = (id, name, email) => {
+      userIdInput.value = id;
+      userNameInput.value = name;
+      userEmailInput.value = email;
+      submitBtn.innerText = "Update User";
+    };
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+    }
+    function escapeJs(str) {
+      return str.replace(/'/g, "\\'");
+    }
+  </script>
+</body>
+</html>
